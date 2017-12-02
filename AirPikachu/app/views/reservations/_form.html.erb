@@ -1,0 +1,136 @@
+<div class="panel panel-default">
+  <div class="panel-heading">
+    <span><i class="fa fa-bolt" style="color: #ffb400;"></i>$ <%= @room.price %></span>
+    <span class="pull-right">Per Night</span>
+  </div>
+  <div class="panel-body">
+    <!-- @room is the parent, and then create @room.reservations.new children -->
+    <%= form_for([@room, @room.reservations.new]) do |f| %>
+      <div class="row">
+        <div class="col-md-6">
+          <label>Check In</label>
+          <%= f.text_field :start_date, readonly: true, placeholder: "Start Date", class: "form-control datepicker" %>
+        </div>
+        <div class="col-md-6">
+          <label>Check Out</label>
+          <%= f.text_field :end_date, readonly: true, placeholder: "End Date", class: "form-control datepicker", disabled: true %>
+          <!-- <%= f.text_field :end_date, readonly: true, placeholder: "End Date", class: "form-control datepicker" %> -->
+        </div>
+      </div>
+      <!-- this is a bad, sequel injection could change the price -->
+      <!-- <%= f.hidden_field :room_id, value: @room.id %> -->
+      <!-- <%= f.hidden_field :price, value: @room.price %> -->
+      <br>
+
+    <h4><span id="message"></span></h4>
+
+    <div id="preview" style="display: none;">
+      <table class="reservation-table">
+        <tbody>
+          <tr>
+            <td>Price</td>
+            <td class="text-right">$<%= @room.price %></td>
+          </tr>
+          <tr>
+            <td>Night(s)</td>
+            <td class="text-right">x<span id="reservation_nights"></span></td>
+          </tr>
+          <tr>
+            <td class="total">Total</td>
+            <td class="text-right">$<span id="reservation_total"></span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <br/>
+    <%= f.submit "Book Now", id: "btn_book", class: "btn btn-normal btn-block", disabled: true %>
+    <% end %>
+  </div>
+</div>
+
+
+
+<script>
+
+  function checkDate(date) {
+    dmy = date.getDate() + "-" + (date.getMonth() + 1) + "-" + date.getFullYear();
+    return [$.inArray(dmy, unavailableDates) == -1];
+  }
+
+  $(function() {
+
+    unavailableDates = [];
+
+    // When the page loads, it will run the $.ajax request to the preload_room_path, then goes to the room_controller in routes.rb and run the preload action (method/def)
+    $.ajax({
+      url: '<%= preload_room_path(@room) %>',
+      dateType: 'json',
+      // data is the result from running the preload action (method/def)
+      success: function(data) {
+        // puts(data) // check
+        // print(data)
+        $.each(data, function(arrID, arrValue) {
+          // console.log(arrValue); //,check this in the inspect element
+          for(var d = new Date(arrValue.start_date); d <= new Date(arrValue.end_date); d.setDate(d.getDate() + 1)) {
+            console.log(d);  //,check this in the inspect element
+            unavailableDates.push($.datepicker.formatDate('d-m-yy', d));
+            // console.log(unavailableDates)
+          }
+        });
+
+        $('#reservation_start_date').datepicker({
+          dateFormat: 'dd-mm-yy',
+          minDate: 0,
+          maxDate: '3m',
+          beforeShowDay: checkDate,
+          onSelect: function(selected) {
+            $('#reservation_end_date').datepicker("option", "minDate", selected);
+            $('#reservation_end_date').attr("disabled", false);
+          }
+        });
+
+        $('#reservation_end_date').datepicker({
+          dateFormat: 'dd-mm-yy',
+          minDate: 0,
+          maxDate: '3m',
+          beforeShowDay: checkDate,
+          onSelect: function(selected) {
+            $('#reservation_start_date').datepicker("option", "max Date", selected);
+
+            var start_date = $('#reservation_start_date').datepicker('getDate');
+            var end_date = $('#reservation_end_date').datepicker('getDate');
+            var nights = (end_date - start_date)/1000/60/60/24 + 1;
+
+            var input = {
+              'start_date': start_date,
+              'end_date': end_date
+            }
+            $.ajax({
+              url: '<%= preview_room_path(@room) %>',
+              data: input,
+              success: function(data){
+
+                if(data.conflict) {
+                  $('#message').text("These dates are not available.");
+                  $('#preveiw').hide();
+                  $('#btn)book').attr('disabled', true);
+                } else {
+                  $('#message').text("");
+                  $('#preview').show();
+                  $('#btn_book').attr('disabled', false);
+``
+                  var total = nights * <%= @room.price %>
+                  $('#reservation_nights').text(nights);
+                  $('#reservation_total').text(total);
+                }
+              }
+            })
+          }
+        });
+      }
+    });
+
+
+  });
+</script>
